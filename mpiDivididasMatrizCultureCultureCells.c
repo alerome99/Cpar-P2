@@ -216,6 +216,7 @@ int main(int argc, char *argv[]) {
 	int	num_cells;		// Number of cells currently stored in the list
 	Cell	*cells;			// List to store cells information
 
+
 	// Statistics
 	Statistics sim_stat;	
 	sim_stat.history_total_cells = 0;
@@ -337,6 +338,7 @@ int main(int argc, char *argv[]) {
 	int my_begin;
 	int my_end;
 	int my_size;
+	int my_num_cells;
 	int procs;
 	float guarda;
 	MPI_Comm_size(MPI_COMM_WORLD,&procs);	
@@ -372,6 +374,7 @@ int main(int argc, char *argv[]) {
 
 	/* 3. Initialize culture surface and initial cells */
 	culture = (float *)malloc( sizeof(float) * (size_t)my_size);
+
 
 	//culture = (float *)malloc( sizeof(float) * (size_t)rows * (size_t)columns );
 
@@ -417,7 +420,25 @@ int main(int argc, char *argv[]) {
 		cells[i].choose_mov[0] = 0.33f;
 		cells[i].choose_mov[1] = 0.34f;
 		cells[i].choose_mov[2] = 0.33f;
+		posicionCells = (int) cells[i].pos_row * columns + (int) cells[i].pos_col;
+		
+		if(posicionCells <= my_end && posicionCells >= my_begin){
+			my_num_cells++;
+		}
 	}
+	
+	Cell *my_cells = (Cell *)malloc( sizeof(Cell) * (size_t)my_num_cells );
+
+	my_num_cells = 0;
+
+	for( i=0; i<num_cells; i++ ) {
+		posicionCells = (int) cells[i].pos_row * columns + (int) cells[i].pos_col;
+		if(posicionCells <= my_end && posicionCells >= my_begin){
+			my_cells[my_num_cells] = cells[i];
+			my_num_cells++;
+		}
+	}
+	
 
 	tiempoBucle2 = cp_Wtime() - tiempoBucle2;
 	tiempoTotalBucle2 = 	tiempoTotalBucle2 + tiempoBucle2;
@@ -480,7 +501,7 @@ int main(int argc, char *argv[]) {
 		}
 
 		for (i=0; i<num_new_sources; i++){
-			if(posVec[i]>my_being && posVec[i]<my_end){ //comprobamos en que array culture pequeño se encuentra, es decir que procesador guardara este alimento
+			if(posVec[i]>=my_begin && posVec[i]<=my_end){ //comprobamos en que array culture pequeño se encuentra, es decir que procesador guardara este alimento
 				posVecReducido = posVec[i]%procs;
 				culture[posVecReducido] = culture[posVecReducido] + foodVec[i]; //en la matriz culture pequeña se añade el alimento nuevo foodVec[i] al antiguo que tenia esa posicion culture[posVecReducido]
 			}
@@ -497,7 +518,7 @@ int main(int argc, char *argv[]) {
 		}
 		if ( food_spot_active ) {
 			for (i=0; i<num_new_sources; i++) {
-				if(posVec2[i]>my_being && posVec2[i]<my_end){ //comprobamos en que array culture pequeño se encuentra, es decir que procesador guardara este alimento
+				if(posVec2[i]>=my_begin && posVec2[i]<=my_end){ //comprobamos en que array culture pequeño se encuentra, es decir que procesador guardara este alimento
 					posVecReducido = posVec2[i]%procs;
 					culture[posVecReducido] = culture[posVecReducido] + foodVec2[i];
 				}				
@@ -527,8 +548,12 @@ int main(int argc, char *argv[]) {
 
 		tiempoBucle3 = cp_Wtime();
 		int history_max_age =  0;
+		int posicionCells = 0;
 		//Para hacer reduction en un array hay que marcar el rango del array que se quiere reducir, como en este caso es todo el array se marca con [:tam_array]E
-		for (i=0; i<num_cells; i++) {
+		//Movimiento celulas
+		for (i=0; i<num_cells; i++) { // (int) cells[i].pos_row * columns + (int) cells[i].pos_col
+			//posicionCells = (int) cells[i].pos_row * columns + (int) cells[i].pos_col;
+			//if(posicionCells <= my_end && posicionCells >= my_begin){
 				cells[i].age ++;
 				// Statistics: Max age of a cell in the simulation history
 				if ( cells[i].age > history_max_age ) history_max_age = cells[i].age;
@@ -577,11 +602,16 @@ int main(int argc, char *argv[]) {
 				accessMat( culture_cells, cells[i].pos_row, cells[i].pos_col ) ++; //culture_cells[i] = cells[i].pos_row * columns + cells[i].pos_col c
 				/* 4.3.5. Annotate the amount of food to be shared in this culture position */
 				food_to_share[i] = accessMat( culture, cells[i].pos_row, cells[i].pos_col );
+			}
 		} // End cell movements
 		num_cells_alive -= step_dead_cells;
 		if(sim_stat.history_max_age < history_max_age){
 			sim_stat.history_max_age =  history_max_age;
 		}
+
+		//MPI_reduce(&sim_stat.history_max_age, &guarda, 1, MPI_FLOAT, MPI_MAX, 0, MPI_COMM_WORLD);
+		//history_max_age = guarda;
+
 		tiempoBucle3 = cp_Wtime() - tiempoBucle3;
 
 		tiempoTotalBucle3 =	tiempoTotalBucle3 + tiempoBucle3;
@@ -589,6 +619,9 @@ int main(int argc, char *argv[]) {
 		/* 4.4. Cell actions */
 		// Space for the list of new cells (maximum number of new cells is num_cells)
 		Cell *new_cells = (Cell *)malloc( sizeof(Cell) * num_cells );
+
+		//Cell *my_new_cells = (Cell *)malloc( sizeof(Cell) * my_num_cells ); //QUEREMOS UN ARRAY NEW_CELLS PARA CADA PROCESADOR O NO LO QUEREMOS DIVIDIR
+
 		if ( new_cells == NULL ) {
 			fprintf(stderr,"-- Error allocating new cells structures for: %d cells\n", num_cells );
 			exit( EXIT_FAILURE );
@@ -661,16 +694,27 @@ int main(int argc, char *argv[]) {
 		int free_position = 0;
 		int alive_in_main_list = 0;
 
-		for (i=0; i<num_cells; i++) {
-			if ( cells[i].alive ) {
-				accessMat( culture, cells[i].pos_row, cells[i].pos_col ) = 0.0f;
-				alive_in_main_list ++;
-				if ( free_position != i ) {
-					cells[free_position] = cells[i];
+		for (i=0; i<my_num_cells; i++) {
+			//posicionCells = (int) cells[i].pos_row * columns + (int) cells[i].pos_col;
+			//if(posicionCells<=my_end && posicionCells>=my_begin){ //comprobamos que la celula se encuentre en ese procesador
+				if ( cells[i].alive ) {
+					//accessMat( culture, cells[i].pos_row, cells[i].pos_col ) = 0.0f;
+					culture[i] = 0.0f; //actualizamos la casilla de solo ese procesador
+					alive_in_main_list ++;
+					if ( free_position != i ) {
+						my_cells[free_position] = my_cells[i]; //Recolocamos vector de celulas de cada procesador
+					}
+					free_position ++;
 				}
-				free_position ++;
-			}
+			//}
 		}
+		/*
+		if(rank == 0){
+				free_position = free_position_suma;
+				alive_in_main_list = alive_in_main_list_suma;
+		}
+		*/
+
 		tiempoBucle5 = cp_Wtime() - tiempoBucle5;
 		tiempoTotalBucle5 =	tiempoTotalBucle5 + tiempoBucle5;
 		/* 4.5.2. Free the ancillary data structure to store the food to be shared */
@@ -679,15 +723,15 @@ int main(int argc, char *argv[]) {
 
 		tiempoTotalBucle6 =	tiempoTotalBucle6 + tiempoBucle6;
 		// 4.6.2. Reduce the storage space of the list to the current number of cells
-		num_cells = alive_in_main_list;
-		cells = (Cell *)realloc( cells, sizeof(Cell) * num_cells );
+		my_num_cells = alive_in_main_list;
+		my_cells = (Cell *)realloc( cells, sizeof(Cell) * my_num_cells ); //reasignamos espacio en funcion de las celulas vivas para cada array cells de cada procesador
 		/* 4.7. Join cell lists: Old and new cells list */
 		tiempoBucle7 = cp_Wtime();
 		if ( step_new_cells > 0 ) {
-			cells = (Cell *)realloc( cells, sizeof(Cell) * ( num_cells + step_new_cells ) );
+			my_cells = (Cell *)realloc( cells, sizeof(Cell) * ( my_num_cells + step_new_cells ) ); //reasignamos espacio en funcion de las celulas vivas que habia y las nuevas que han nacido (step_new_cells)
 			for (j=0; j<step_new_cells; j++)
-				cells[ num_cells + j ] = new_cells[ j ];
-			num_cells += step_new_cells;
+				my_cells[ my_num_cells + j ] = new_cells[ j ]; //le asignamos la nuevas celulas almacenadas en el array new_cells
+			my_num_cells += step_new_cells; //sumamos el numero de celulas de cada proceso a las que han nacido en ese proceso
 		}
 		free( new_cells );
 		tiempoBucle7 = cp_Wtime() - tiempoBucle7;
@@ -697,7 +741,6 @@ int main(int argc, char *argv[]) {
 		/* 4.8. Decrease non-harvested food */
 		tiempoBucle8 = cp_Wtime();
 		current_max_food = 0.0f;
-		printf("hola");
 
 		//MPI_Scatter (culture, (rows*columns)/procs, MPI_FLOAT, cultureAux, (rows*columns)/procs, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
@@ -706,6 +749,9 @@ int main(int argc, char *argv[]) {
 			if ( cultureAux[i] > current_max_food )
 				current_max_food = cultureAux[i];	
 		}	*/
+
+
+		//FALTA
 
 		for( i=0; i<rows * columns; i++ ){
 			culture[i] *= 0.95f;
