@@ -336,16 +336,14 @@ int main(int argc, char *argv[]) {
  */
 	//A cada procesador se le asigna un numero de filas
 	
-	int my_begin;
-	int my_end;
-	int my_size;
-	int my_num_cells;
-	int procs;
-	int posicionMyCells = 0;
-	int posicionCells = 0;
-	int rankTemp = 0;
-	float guarda;
-	int muertesFalsas;
+	int my_begin; //principio de cada procesador en el array general
+	int my_end; //final de cada procesador en el array general
+	int my_size; //tamaño de matriz asignado a cada procesador 
+	int my_num_cells; //numero de celulas de cada procesador
+	int procs; //numero de procesadores
+	int posicionMyCells = 0; //posicion real de la celula pasada a entero, si: row=21.2 col=22.4 -> posicionMyCells=21*22 pero usando my_cells para calcularlo, se usa en el bucle 4
+	int rankTemp = 0; //rango del procesador al que se va a enviar la celula (usado en el bucle 4.3 para saber el procesador al que se le esta enviando una celula)
+
 	MPI_Comm_size(MPI_COMM_WORLD,&procs);	
 
 	//creacion estructura mpi celula
@@ -378,8 +376,9 @@ int main(int argc, char *argv[]) {
 	//Si el numero de filas es divisible entre el numero de procs a cada proc se le asignan rows/size filas + 2 bordes
 	//Si no, se hace lo mismo pero a la última se le asigna, ademas, el resto (modulo)
 
+	//Declaramos inicio y fin de cada proceso y el tamaño del culture de cada proceso
 
-	//Declaramos inicio y fin de cada proceso
+	//El proceso 0 no va a hacer nada, solo recibe y envia cosas 
 
 	if(rank!=0){
 		if (size%(procs-1)==0) {
@@ -403,7 +402,7 @@ int main(int argc, char *argv[]) {
 	MPI_Status state;
 
 	/* 3. Initialize culture surface and initial cells */
-	culture = (float *)malloc( sizeof(float) * (size_t)my_size);
+	culture = (float *)malloc( sizeof(float) * (size_t)my_size); //culture dividido
 
 
 	//culture = (float *)malloc( sizeof(float) * (size_t)rows * (size_t)columns );
@@ -412,7 +411,7 @@ int main(int argc, char *argv[]) {
 	//float *cultureAux = (float *)malloc( sizeof(float) * (size_t)rows * (size_t)columns );
 	//culture_cells = (short *)malloc( sizeof(short) * (size_t)rows * (size_t)columns );
 
-	culture_cells = (short *)malloc( sizeof(short) * (size_t)my_size);
+	culture_cells = (short *)malloc( sizeof(short) * (size_t)my_size); //culture_cells dividido
 
 
 	if ( culture == NULL || culture_cells == NULL ) {
@@ -454,28 +453,30 @@ int main(int argc, char *argv[]) {
 		cells[i].choose_mov[0] = 0.33f;
 		cells[i].choose_mov[1] = 0.34f;
 		cells[i].choose_mov[2] = 0.33f;
-		posicionCells = (int) cells[i].pos_row * columns + (int) cells[i].pos_col;
+		posicionMyCells = (int) cells[i].pos_row * columns + (int) cells[i].pos_col;
 		
-		if(posicionCells <= my_end && posicionCells >= my_begin){
+		if(posicionMyCells <= my_end && posicionMyCells >= my_begin){ //si la celula pertenece al proceso incrementa la variable de numero de celulas de cada proceso
 			my_num_cells++;
 		}
 	}
 	
-	Cell *my_cells = (Cell *)malloc( sizeof(Cell) * (size_t)my_num_cells );
+	Cell *my_cells = (Cell *)malloc( sizeof(Cell) * (size_t)my_num_cells ); //creamos un array con las celulas de cada proceso
 
-	my_num_cells = 0;
+	my_num_cells = 0; //reseteamos el valor
+
+	//repetimos el bucle de encima para rellenar my_cells con las celulas de cells que le correspondan a cada procesador
 
 	for( i=0; i<num_cells; i++ ) {
-		posicionCells = (int) cells[i].pos_row * columns + (int) cells[i].pos_col;
-		if(posicionCells <= my_end && posicionCells >= my_begin){
-			my_cells[my_num_cells] = cells[i];
-			my_num_cells++;
+		posicionMyCells = (int) cells[i].pos_row * columns + (int) cells[i].pos_col;
+		if(posicionMyCells <= my_end && posicionMyCells >= my_begin){
+			my_cells[my_num_cells] = cells[i]; //añadimos la celula al array de ese proceso
+			my_num_cells++; //incrementamos su numero de celulas
 		}
 	}
 
-	free(cells);
+	posicionMyCells = 0; //reseteamos valor para el resto de la ejecucion
+	free(cells); //liberamos el espacio de cells, a partir de aqui solo se usara my_cells que sera el array de celulas de cada procesador
 	
-
 	tiempoBucle2 = cp_Wtime() - tiempoBucle2;
 	tiempoTotalBucle2 = 	tiempoTotalBucle2 + tiempoBucle2;
 
@@ -521,9 +522,6 @@ int main(int argc, char *argv[]) {
 
 		int num_new_sources = (int)(rows * columns * food_density); //no cambiamos, el numero de recursos no tiene que ver con la particion
 
-		/*#pragma omp parallel for default(none) shared(food_random_seq, culture, food_level, columns, rows	) private(i, row, col, food) firstprivate(num_new_sources)*/
-		/*#pragma omp parallel sections num_threads(2)*/
-		// In the special food spot
 		float *foodVec = (float *)malloc( sizeof(float) * num_new_sources );
 		int *posVec = (int *)malloc( sizeof(int) * num_new_sources );
 		float *foodVec2 = (float *)malloc( sizeof(float) * num_new_sources );
@@ -533,15 +531,17 @@ int main(int argc, char *argv[]) {
 		  	row = (int)(rows * erand48( food_random_seq ));
 			col = (int)(columns * erand48( food_random_seq ));
 			foodVec[i] = (float)( food_level * erand48( food_random_seq )); //cuanta comida a esa casilla tamañoArray = num_new_sources
-			posVec[i] = row*columns+col; // a que casilla se le da la comida tamañoArray = num_new_sources
+			posVec[i] = row*columns+col; // a que casilla real se le da la comidatamañoArray = num_new_sources
 		}
 
 		for (i=0; i<num_new_sources; i++){
 			if(posVec[i]>=my_begin && posVec[i]<=my_end){ //comprobamos en que array culture pequeño se encuentra, es decir que procesador guardara este alimento
-				posVecReducido = posVec[i]%(procs-1);
+				posVecReducido = posVec[i]%(procs-1); //para saber la posicion a la que corresponderia en el culture pequeño la posicion en la que se le esta dando comida
 				culture[posVecReducido] = culture[posVecReducido] + foodVec[i]; //en la matriz culture pequeña se añade el alimento nuevo foodVec[i] al antiguo que tenia esa posicion culture[posVecReducido]
 			}
 		}
+
+		//lo mismo que arriba pero con el spot de comida activado
 
 		if ( food_spot_active ) {
 			num_new_sources = (int)(food_spot_size_rows * food_spot_size_cols * food_spot_density);
@@ -824,8 +824,6 @@ int main(int argc, char *argv[]) {
 		int alive_in_main_list = 0;
 
 		for (i=0; i<my_num_cells; i++) {
-			//posicionCells = (int) cells[i].pos_row * columns + (int) cells[i].pos_col;
-			//if(posicionCells<=my_end && posicionCells>=my_begin){ //comprobamos que la celula se encuentre en ese procesador
 				if ( cells[i].alive ) {
 					//accessMat( culture, cells[i].pos_row, cells[i].pos_col ) = 0.0f;
 					culture[i] = 0.0f; //actualizamos la casilla de solo ese procesador
