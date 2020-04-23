@@ -446,7 +446,7 @@ int main(int argc, char *argv[]) {
 		float angle = (float)(2 * M_PI * erand48( cells[i].random_seq ));
 		cells[i].mov_row = sinf( angle ); 
 		cells[i].mov_col = cosf( angle );
-		
+
 		if ( cells[i].pos_row >= rows ) cells[i].pos_row -= rows;
 		if ( cells[i].pos_col >= columns ) cells[i].pos_col -= columns;
 		// Movement genes: Probabilities of advancing or changing direction: The sum should be 1.00
@@ -686,6 +686,7 @@ int main(int argc, char *argv[]) {
 
 		} // End cell movements
 
+		//EMPIEZAN RECIBOS Y ENVIOS
 
 		if(rank!=0){ //todos los procesos salvo el 0 envian su vector al 0 
 			MPI_Send(&numero_Recibos, procs, MPI_INT, 0, 1, MPI_COMM_WORLD);
