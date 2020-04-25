@@ -343,6 +343,9 @@ int main(int argc, char *argv[]) {
 	int procs; //numero de procesadores
 	int posicionMyCells = 0; //posicion real de la celula pasada a entero, si: row=21.2 col=22.4 -> posicionMyCells=21*22 pero usando my_cells para calcularlo, se usa en el bucle 4
 	int rankTemp = 0; //rango del procesador al que se va a enviar la celula (usado en el bucle 4.3 para saber el procesador al que se le esta enviando una celula)
+	int guarda = 0;
+	int posicionMyCellsEnMiCulture = 0;
+	int posicionMyNewCells = 0;
 
 	MPI_Comm_size(MPI_COMM_WORLD,&procs);	
 
@@ -367,13 +370,11 @@ int main(int argc, char *argv[]) {
 	    MPI_Datatype types[9] = { MPI_FLOAT, MPI_FLOAT, MPI_FLOAT, MPI_FLOAT, MPI_FLOAT, MPI_FLOAT, MPI_INT, MPI_UNSIGNED_SHORT, MPI_C_BOOL};
 
 	    MPI_Type_create_struct(9, lengths, disp, types, &MPI_CELULAS);
-	    /*
 	    MPI_Aint lb, ext;
 	    MPI_Datatype MPI_CELL_EXT;
 	    MPI_Type_get_extent(MPI_CELULAS, &lb, &ext);
 	    MPI_Type_create_resized(MPI_CELULAS, lb, ext, &MPI_CELL_EXT);
-	    */
-    MPI_Type_commit(&MPI_CELULAS);
+    MPI_Type_commit(&MPI_CELL_EXT);
 
 	int size = rows * columns;
 	//int my_rows = rows/procs;
@@ -411,8 +412,6 @@ int main(int argc, char *argv[]) {
 	//Declaramos inicio y fin de cada proceso y el tamaño del culture de cada proceso
 
 	//El proceso 0 no va a hacer nada, solo recibe y envia cosas 
-
-	if(rank!=0){
 		if (size%procs==0) {
 			my_size = size/procs;
 			my_begin = my_size*rank;
@@ -428,10 +427,9 @@ int main(int argc, char *argv[]) {
 				my_end = size - 1;
 			}
 		}
-	}
 
 	MPI_Status state;
-
+	printf("el rango %i tiene tamaño %i", rank, my_size);
 	/* 3. Initialize culture surface and initial cells */
 	culture = (float *)malloc( sizeof(float) * (size_t)my_size); //culture dividido
 
@@ -494,7 +492,7 @@ int main(int argc, char *argv[]) {
 			my_num_cells++;
 			//printf("incrementamos%i", my_num_cells);
 		}
-	}
+	}	
 	
 	Cell *my_cells = (Cell *)malloc( sizeof(Cell) * (size_t)my_num_cells ); //creamos un array con las celulas de cada proceso
 	//printf("primero%i", my_num_cells);
@@ -516,7 +514,7 @@ int main(int argc, char *argv[]) {
 
 
 	posicionMyCells = 0; //reseteamos valor para el resto de la ejecucion
-	free(cells); //liberamos el espacio de cells, a partir de aqui solo se usara my_cells que sera el array de celulas de cada procesador
+	//free(cells); //liberamos el espacio de cells, a partir de aqui solo se usara my_cells que sera el array de celulas de cada procesador
 	
 	tiempoBucle2 = cp_Wtime() - tiempoBucle2;
 	tiempoTotalBucle2 = 	tiempoTotalBucle2 + tiempoBucle2;
@@ -562,12 +560,12 @@ int main(int argc, char *argv[]) {
 		int posVecReducido; //guardara la posicion del culture pequeño donde se va a añadir la comida, es decir si era la 208 sera la 8 del pequeño del procesador 20
 
 		int num_new_sources = (int)(rows * columns * food_density); //no cambiamos, el numero de recursos no tiene que ver con la particion
-
+		printf("\n");
 		float *foodVec = (float *)malloc( sizeof(float) * num_new_sources );
 		int *posVec = (int *)malloc( sizeof(int) * num_new_sources );
 		float *foodVec2 = (float *)malloc( sizeof(float) * num_new_sources );
 		int *posVec2 = (int *)malloc( sizeof(int) * num_new_sources );
-
+		printf("\n");
 		for (i=0; i<num_new_sources; i++) {
 		  	row = (int)(rows * erand48( food_random_seq ));
 			col = (int)(columns * erand48( food_random_seq ));
@@ -623,11 +621,16 @@ int main(int argc, char *argv[]) {
 		Cell temporal;
 		tiempoBucle3 = cp_Wtime();
 		int history_max_age =  0;
-
+		printf("numero de celulas %i     rank %i",my_num_cells, rank);
 		Cell *my_cellsEnviadas = (Cell *)malloc( sizeof(Cell) * (size_t)my_num_cells ); //almacena las celulas que va a enviar, en caso de que no vaya a enviar ninguna se envia vacion (siempre se envia)
+		printf("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb%i                  ", rank);
+		printf("\n");
 		int *rank_Enviadas = (int *)malloc( sizeof(int) * (size_t)my_num_cells ); //almacena el rank al que se van a enviar las celulas
-		int *numero_Recibos = (int *)calloc( sizeof(int) , (size_t)procs ); //vector que guarda el numero de celulas que va a recibir cada proceso numero_Recibido([0],[2],[3]...)
-		//free(numero_Recibos);
+		printf("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC%i                  ", rank);
+		printf("\n");
+		int *numero_Recibos = (int *)malloc( sizeof(int) * (size_t)procs ); //vector que guarda el numero de celulas que va a recibir cada proceso numero_Recibido([0],[2],[3]...)
+		printf("DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD%i                  ", rank);
+		printf("\n");
 		//El proceso 0 va a recibir 0, el proceso 1 va a recibir 2, el proceso 2 va a recibir 3 ...
 		int enviados = 0; //numero de celulas que envia cada proceso
 
@@ -712,22 +715,7 @@ int main(int argc, char *argv[]) {
 
 
 	            posicionMyCells = (int) my_cells[i].pos_row * columns + (int) my_cells[i].pos_col; //posicion nueva de la celula despues del movimiento
-	            //printf("%i", posicionMyCells);
-	            /*if(mensaje == 1){
-	            	MPI_Recv(&temporal, 1, MPI_INT, MPI_ANY_SOURCE, 1, MPI_COMM_WORLD, &state); //recibimos objeto
-	            	//quedara guardarlo en un array 
-	            	my_num_cells++;
-	            }*/
-	            //printf("row%i",(int) my_cells[i].pos_row);
-	            //printf("col%i",(int) my_cells[i].pos_col);
-	         	//printf("quepasa%i",posicionMyCells);
-	            //printf("\n");	
 
-	            //rankTemp = posicionMyCells/my_size + 1;
-	            //printf("adios%i",my_size);
-	            //printf("ranktemp%i",rankTemp);
-	            //printf("\n");
-	            //printf("\n");
 
 
 	            if(posicionMyCells<my_begin || posicionMyCells>my_end){ //Comprobamos si la celula se ha movido de procesador
@@ -735,114 +723,33 @@ int main(int argc, char *argv[]) {
 	            	if(rankTemp>procs-2){//El ultimo es el unico que puede dar mal
 	            		rankTemp = procs-1;
 	            	}
-	            	printf("ayer me cai de la bici");
-	            	printf("\n");
 	            	//printf("adios%i",rankTemp);
 	            	//printf("\n");
 	            	rank_Enviadas[enviados] = rankTemp; //Guardamos el rank del proceso al que se va a enviar la celula
 	            	my_cellsEnviadas[enviados] = my_cells[i]; //Guardamos la celula que vamos a enviar
-	            	//printf("hola buenos dias%i", numero_Recibos[rankTemp]);
 	            	numero_Recibos[rankTemp] ++; //Aumentamos el numero de recibos de cada proceso
-	            	//printf("hola buenos dias%i", numero_Recibos[rankTemp]);
 
 	            	my_cells[i].alive = false; //Matamos la celula para que descaparezca de este proceso;
 	            	enviados++;	//Aumentamos el numero de celulas enviadas
 
-
-
-	            	//Cambiar la linea de encima, no se puede marcar como muerta por que luego se incrementara sin
-	            	//mensaje = 1;
-	            	//MPI_ISend(&mensaje, 1, MPI_INT, rankTemp, 1, MPI_COMM_WORLD); //enviamos mensaje con valor 1
-	            	//MPI_ISend(&temporal, 1, MPI_INT, rankTemp, 1, MPI_COMM_WORLD); //enviamos objeto
 	            }
 
-					/* 4.3.4. Annotate that there is one more cell in this culture position */
-
-	            	//hay que quitarlo de aqui***************************************************************************************************************************************************************
-					//accessMat( culture_cells, cells[i].pos_row, cells[i].pos_col ) ++; //culture_cells[i] = cells[i].pos_row * columns + cells[i].pos_col c
-
-					/* 4.3.5. Annotate the amount of food to be shared in this culture position */
-					//food_to_share[i] = accessMat( culture, cells[i].pos_row, cells[i].pos_col );
-					//hasta aqui ****************************************************************************************************************************************************************************
-	        //}
 		} // End cell movements
 
-		//EMPIEZAN RECIBOS Y ENVIOS
-		
-		/*
-		if(rank!=0){ //todos los procesos salvo el 0 envian su vector al 0 
-			MPI_Send(&numero_Recibos, procs, MPI_INT, 0, 1, MPI_COMM_WORLD);
-		}*/
 
-		
-		for(i=0;i<procs;i++){
-			printf("ssssss              %i",numero_Recibos[i]);
-			printf("\n");
-		}
-
-		int contadorCellsRecibidas = 0;	
+		int contadorCellsRecibidas = 0;
 
 
-		int *numero_RecibosTotales = (int *)calloc( sizeof(int) , (size_t)procs );
+		int *numero_RecibosTotales = (int *)malloc( sizeof(int) * (size_t)procs );
 
-		//printf("%i",numero_RecibosTotales[0]);
-			printf("por que mi madre no me quiere%i", numero_Recibos[0]);
-			printf("\n");
-			MPI_Allreduce(&numero_Recibos, &numero_RecibosTotales, procs, MPI_INT, MPI_SUM, MPI_COMM_WORLD); //todos los procesos van a tener el array numero_RecibosTotales con el numero de celulas que van a recibir
-  			printf("lo logre wey%i", numero_RecibosTotales[0]);
-  			printf("\n");
+		for(i=0; i<procs; i++){
+			MPI_Allreduce(&numero_Recibos[i], &numero_RecibosTotales[i], 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD); //todos los procesos van a tener el array numero_RecibosTotales con el numero de celulas que van a recibir
+		}	
 		
 		contadorCellsRecibidas = numero_RecibosTotales[rank];
 		
-		printf("el proceso %i tiene que recibir %i", rank,  contadorCellsRecibidas);
-		printf("\n");
-
-
-		//MPI_Reduce(&numero_Recibos, &numero_RecibosTotales, procs, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-
-		//int enviadosTotales=0;
-
-		/*
-		if(rank==0){
-			printf("mario%i", enviadosTotales);
-		}
-		*/
-
-		 
-		 /*
-		if(rank==0){
-			for(i=0;i<procs;i++){
-				printf("hhhhhhh%i",numero_RecibosTotales[i]);
-			}
-		}*/
-		
-		
-
-		//if(rank==0){ //si es el proceso 0+
-			//printf("estamos entrando");
-			//MPI_Reduce(&numero_Recibos, &numero_RecibosTotales, procs, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD); //almacena en numero_RecibosTotales la suma de todos los recibos de cada proces
-			//printf("estamos siguiendo");
-			//printf("ssssss%i",numero_RecibosTotales[0]);
-			//obtendremos en cada posicion del array el numero de celulas que va a recibir cada proceso numero_RecibosTotales[1] = 8 -> el proceso 1 va a recibir 8 celulas en total
-
-
-			/* SUPONIENDO QUE EL REDUCE NO FUNCIONE SE HARIA ASI *****************************************************************************************************************************************
-			for(i=0; i<procs-1; i++){
-				MPI_Recv(&numero_Recibos, procs-1, MPI_INT, MPI_ANY_SOURCE, 1, MPI_COMM_WORLD, &state);
-				for(int r=0; r<procs-1; r++){
-					numero_RecibosTotales[r]+=numero_Recibos[r];
-				}
-			}*/
-
-
-			//MPI_Scatter(&numero_RecibosTotales, 1, MPI_INT, &contadorCellsRecibidas, 1, MPI_INT, 0, MPI_COMM_WORLD); //envia a cada proceso un entero con el numero de celulas que va a recibir 
-		//}
-
-		//printf("ssssss%i",numero_RecibosTotales[4]);
-		//printf("wqdwqdwqdqwdqw%i",contadorCellsRecibidas);
 
 		Cell *celulasRecibidas = (Cell *)malloc( sizeof(int) * (size_t)contadorCellsRecibidas ); //array en el que se van a almacenar las celulas recibidas TAM = celulas que va a recibir
-		int meAburro = 0;
 		//todos los que no sean el proceso 0
 		if(enviados!=0){ //si han enviado alguna celula
 			
@@ -850,18 +757,14 @@ int main(int argc, char *argv[]) {
 			for(int k = 0; k<enviados; k++){ //recorren el array de celulas enviadas y vamos enviando una a una sabiendo el rango al que se le envia y la celula que se envia
 			//falta el buffer************************************************************************************************************************************************************************
 				//printf("enviamos");
-				printf("edadEnviar%i quien envia         %i    a donde envia       %i", my_cellsEnviadas[k].age, rank, rank_Enviadas[k]);
-				printf("\n");
+				//printf("edadEnviar%i quien envia         %i    a donde envia       %i", my_cellsEnviadas[k].age, rank, rank_Enviadas[k]);
 				//printf("\n");
-				MPI_Send(&my_cellsEnviadas[k], 1, MPI_CELULAS, rank_Enviadas[k], 1, MPI_COMM_WORLD);	
+				//printf("\n");
+				MPI_Send(&my_cellsEnviadas[k], 1, MPI_CELL_EXT, rank_Enviadas[k], 1, MPI_COMM_WORLD);	
 				//printf("años%i",my_cellsEnviadas[k].age);					
 			}
 		}
-		/*
-		if(rank==0){
-			printf("recibimos2222%i",contadorCellsRecibidas);
-		}		
-		*/
+
 
 		MPI_Barrier(MPI_COMM_WORLD); //si no no tira
 
@@ -869,32 +772,25 @@ int main(int argc, char *argv[]) {
 			printf("\n");
 			for(int k = 0; k<contadorCellsRecibidas; k++){ //recorre hasta el total que tiene que recibir
 				Cell celulaRecibida; //celula que se va a recibir
-				MPI_Recv(&celulaRecibida, 1, MPI_CELULAS, MPI_ANY_SOURCE, 1, MPI_COMM_WORLD, &state); //recibe una celula
+				MPI_Recv(&celulaRecibida, 1, MPI_CELL_EXT, MPI_ANY_SOURCE, 1, MPI_COMM_WORLD, &state); //recibe una celula
 				//MPI_Wait(MPI_COMM_WORLD);
-				printf("edadRecibir%i   lo recibe       %i", celulaRecibida.age, rank);
-				printf("\n");
+				//printf("edadRecibir%i   lo recibe       %i", celulaRecibida.age, rank);
+				//printf("\n");
 				//printf("años%i",celulasRecibida.age);
 				celulasRecibidas[k] = celulaRecibida; //almacena la celula recibida en el array de celulas totales recibidas
 			}				
 		}
 
-		MPI_Barrier(MPI_COMM_WORLD); //si no no tira
+		//MPI_Barrier(MPI_COMM_WORLD); //si no no tira
 
 		int my_num_cellsTemp = my_num_cells; 
 
-		/*
-		if(rank==1){
-			printf("tengo muchas celulas %i", my_num_cells);
-		}
-		
-		if(rank==1){
-			printf("tengo mas celulas ahora  %i", my_num_cells);
-		}
-		*/
-
 		my_num_cells += contadorCellsRecibidas;
 
-		my_cells = (Cell *)realloc( cells, sizeof(Cell) * my_num_cells );
+
+		my_cells = (Cell *)realloc(my_cells, sizeof(Cell) * my_num_cells );
+
+
 
 
 		int indice = 0;
@@ -907,36 +803,91 @@ int main(int argc, char *argv[]) {
 			}
 		}
 
+		
+
 		/*
 		if(rank==1){
 			printf("\n");
 			printf("Esto si que no me lo esperaba%i", my_cells[3].age);
 		}*/
+		/*
+		if(rank==0){
+			for(i=0; i<my_size; i++){
+				printf("antes de recbirlo%i", culture_cells[i]);
+				printf("\n");
+			}						
+		}*/
 
 		for (i=0; i<my_num_cells; i++) { 
-			posicionMyCells = (int) my_cells[i].pos_row * columns + (int) my_cells[i].pos_col;
-			posicionMyCells -= my_begin;
+			/*
+			if(rank==0){
+				printf("Estoy entrando en el bucle");
+				printf("\n");
+			}*/
+			posicionMyCellsEnMiCulture = (int) my_cells[i].pos_row * columns + (int) my_cells[i].pos_col;
+			posicionMyCellsEnMiCulture -= my_begin;
 			//*******************************************************************************************************************************************************************************************
 			//es lo mismo la linea de debajo y la comentada?
-			culture_cells[posicionMyCells]++;
+			/*
+			if(rank==0){
+				printf("Vamos a incrementar la posicion%i",posicionMyCells);
+				printf("\n");
+			}*/
+			culture_cells[posicionMyCellsEnMiCulture]++;
+
 			//acessMat( culture_cells, my_cells[i].pos_row, my_cells[i].pos_col ) ++; 
-			food_to_share[i] = culture_cells[posicionMyCells];
+			food_to_share[i] = culture_cells[posicionMyCellsEnMiCulture];
 		}
+		/*
+		if(rank==0){
+			for(i=0; i<my_size; i++){
+				printf("despues de recibirlo%i", culture_cells[i]);
+				printf("\n");
+			}						
+		}*/
 
-		printf("puede que aqui no lleguemos");
-
-		//printf ("adios");
 
 
 		//Hacer realloc con el nuevo tamaño de my_cells -> Sera contadorCellsRecibidas + my_num_cells****************************************************************************************************
 		//Falta añadir las celulasRecibidas al array de my_cells de cada proceso*************************************************************************************************************************
 		//Hacer el accesMat del bucle 3 de culture_cells y el food_to_share =**************************************************************************************************************************** 
 
-
-
 		num_cells_alive -= step_dead_cells;
-		if(sim_stat.history_max_age < history_max_age){
-			sim_stat.history_max_age =  history_max_age;
+		
+		if(rank==0){
+			printf("Historymaxage antes    %i", history_max_age);
+			printf("\n");
+		}
+		
+		int peque = 0;	
+
+		MPI_Reduce(&history_max_age, &peque, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
+		/*
+		free (my_cellsEnviadas);
+		free (rank_Enviadas);
+		free (numero_Recibos);
+		free (celulasRecibidas);
+		free (numero_RecibosTotales);
+		*/
+		enviados = 0;
+		/*
+		my_cellsEnviadas = (Cell *)malloc( sizeof(int) * my_num_cells );
+		rank_Enviadas = (int *)malloc( sizeof(int) * my_num_cells );
+		numero_Recibos = (int *)malloc( sizeof(Cell) * procs );
+		numero_RecibosTotales = (int *)malloc( sizeof(int) * procs );
+		*/
+		//printf("llega el 0");
+		printf("\n");
+		if(sim_stat.history_max_age < peque){
+			sim_stat.history_max_age =  peque;
+		}
+
+		printf("llegamos00            %i",         rank);
+		printf("\n");
+
+		if(rank==0){
+			printf("Historymaxage despues    %i", peque);
+			printf("\n");
 		}
 
 		//MPI_reduce(&sim_stat.history_max_age, &guarda, 1, MPI_FLOAT, MPI_MAX, 0, MPI_COMM_WORLD);
@@ -948,27 +899,35 @@ int main(int argc, char *argv[]) {
 
 		/* 4.4. Cell actions */
 		// Space for the list of new cells (maximum number of new cells is num_cells)
-		Cell *new_cells = (Cell *)malloc( sizeof(Cell) * num_cells );
+		MPI_Barrier(MPI_COMM_WORLD);
+
+		Cell *new_cells = (Cell *)malloc( sizeof(Cell) * my_num_cells );
 
 		//Cell *my_new_cells = (Cell *)malloc( sizeof(Cell) * my_num_cells ); //QUEREMOS UN ARRAY NEW_CELLS PARA CADA PROCESADOR O NO LO QUEREMOS DIVIDIR
 
 		if ( new_cells == NULL ) {
-			fprintf(stderr,"-- Error allocating new cells structures for: %d cells\n", num_cells );
+			fprintf(stderr,"-- Error allocating new cells structures for: %d cells\n", my_num_cells );
 			exit( EXIT_FAILURE );
 			MPI_Abort( MPI_COMM_WORLD, EXIT_FAILURE );
 		}
 
+		Cell *my_cellsEnviadas2 = (Cell *)malloc( sizeof(Cell) * (size_t)my_num_cells ); //almacena las celulas que va a enviar, en caso de que no vaya a enviar ninguna se envia vacion (siempre se envia)
+		int *rank_Enviadas2 = (int *)malloc( sizeof(int) * (size_t)my_num_cells ); //almacena el rank al que se van a enviar las celulas
+		int *numero_Recibos2 = (int *)malloc( sizeof(int) * (size_t)procs ); //vector que guarda el numero de celulas que va a recibir cada proceso numero_Recibido([0],[2],[3]...)
+
 		tiempoBucle4 = cp_Wtime();
-		for (i=0; i<num_cells; i++) {
-			if ( cells[i].alive ) {
+		for (i=0; i<my_num_cells; i++) {
+			if ( my_cells[i].alive ) {
 				/* 4.4.1. Food harvesting */
 				float food = food_to_share[i];
-				short count = accessMat( culture_cells, cells[i].pos_row, cells[i].pos_col );
+				posicionMyCellsEnMiCulture = (int) my_cells[i].pos_row * columns + (int) my_cells[i].pos_col;
+				posicionMyCellsEnMiCulture -= my_begin;
+				short count = culture_cells[posicionMyCellsEnMiCulture];
 				float my_food = food / count;
-				cells[i].storage += my_food;
+				my_cells[i].storage += my_food;
 
 				/* 4.4.2. Split cell if the conditions are met: Enough maturity and energy */
-				if ( cells[i].age > 30 && cells[i].storage > 20 ) {
+				if ( my_cells[i].age > 30 && my_cells[i].storage > 20 ) {
 
 					int new = 0;
 
@@ -976,11 +935,11 @@ int main(int argc, char *argv[]) {
 
 					
 					// New cell is a copy of parent cell
-					new_cells[ new ] = cells[i];
+					new_cells[ new ] = my_cells[i];
 
 					// Split energy stored and update age in both cells
-					cells[i].age = 1;
-					cells[i].storage /= 2.0f;
+					my_cells[i].age = 1;
+					my_cells[i].storage /= 2.0f;
 
 					new_cells[ new ].storage /= 2.0f;
 					
@@ -992,12 +951,11 @@ int main(int argc, char *argv[]) {
 					new_cells[ new ].random_seq[2] = (unsigned short)nrand48( cells[i].random_seq );
 					// Both cells start in random directions
 					
-					float angle = (float)(2 * M_PI * erand48( cells[i].random_seq ));
-					cells[i].mov_row = sinf( angle );
-					cells[i].mov_col = cosf( angle );
+					float angle = (float)(2 * M_PI * erand48( my_cells[i].random_seq ));
+					my_cells[i].mov_row = sinf( angle );
+					my_cells[i].mov_col = cosf( angle );
 					
 
-					
 					
 					angle = (float)(2 * M_PI * erand48( new_cells[new].random_seq ));
 					new_cells[new].mov_row = sinf( angle );
@@ -1007,9 +965,109 @@ int main(int argc, char *argv[]) {
 
 					cell_mutation( &new_cells[ new ] );
 
+					posicionMyCells = (int) my_cells[i].pos_row * columns + (int) my_cells[i].pos_col;
+
+					posicionMyNewCells = (int) new_cells[i].pos_row * columns + (int) new_cells[i].pos_col;
+
+					if(posicionMyCells<my_begin || posicionMyCells>my_end){ //Comprobamos si la celula se ha movido de procesador
+						printf("sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss%i", rank);
+						printf("\n");
+	            		rankTemp = posicionMyCells/my_size; //Calculamos el procesador al que se ha movido hay que sumar 1 por que hemos quitado el proc 0
+	            		if(rankTemp>procs-2){//El ultimo es el unico que puede dar mal
+	            			rankTemp = procs-1;
+	            		}
+	            		rank_Enviadas2[enviados] = rankTemp; 
+	            		my_cellsEnviadas2[enviados] = my_cells[i]; 
+	            		numero_Recibos2[rankTemp] ++; 
+
+	            		my_cells[i].alive = false; 
+	            		enviados++;	
+	            	}
+
+	            	if(posicionMyNewCells<my_begin || posicionMyNewCells>my_end){ //Comprobamos si la celula se ha movido de procesador
+	            		printf("sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss%i", rank);
+	            		printf("\n");
+	            		rankTemp = posicionMyNewCells/my_size; //Calculamos el procesador al que se ha movido hay que sumar 1 por que hemos quitado el proc 0
+	            		if(rankTemp>procs-2){//El ultimo es el unico que puede dar mal
+	            			rankTemp = procs-1;
+	            		}
+	            		rank_Enviadas2[enviados] = rankTemp; 
+	            		my_cellsEnviadas2[enviados] = my_cells[i]; 
+	            		numero_Recibos2[rankTemp] ++; 
+
+	            		my_cells[i].alive = false; 
+	            		enviados++;	
+	            	}
 				}
 			}
 		}  // End cell actions
+
+		contadorCellsRecibidas = 0;
+		int *numero_RecibosTotales2 = (int *)malloc( sizeof(int) * (size_t)procs );
+
+		for(i=0; i<procs; i++){
+			MPI_Allreduce(&numero_Recibos2[i], &numero_RecibosTotales2[i], 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD); //todos los procesos van a tener el array numero_RecibosTotales con el numero de celulas que van a recibir
+		}	
+		
+		contadorCellsRecibidas = numero_RecibosTotales2[rank];
+		printf("esta funcionando%i          rank            %i", contadorCellsRecibidas, rank);
+		printf("\n");
+
+		Cell *celulasRecibidas2 = (Cell *)malloc( sizeof(int) * (size_t)contadorCellsRecibidas );
+		
+		if(enviados!=0){ //si han enviado alguna celula			
+			printf("\n");
+			for(int k = 0; k<enviados; k++){ //recorren el array de celulas enviadas y vamos enviando una a una sabiendo el rango al que se le envia y la celula que se envia
+			//falta el buffer************************************************************************************************************************************************************************
+				//printf("enviamos");
+				printf("edadEnviar%i quien envia         %i    a donde envia       %i", my_cellsEnviadas[k].age, rank, rank_Enviadas[k]);
+				printf("\n");
+				//printf("\n");
+				MPI_Send(&my_cellsEnviadas2[k], 1, MPI_CELL_EXT, rank_Enviadas2[k], 1, MPI_COMM_WORLD);	
+				//printf("años%i",my_cellsEnviadas[k].age);					
+			}
+		}
+
+		printf("holaaaaaaa");
+		printf("\n");
+		printf("holaaaaaaadwddddddddddddd");
+		printf("\n");
+
+
+		MPI_Barrier(MPI_COMM_WORLD); //si no no tira
+
+		if(contadorCellsRecibidas!=0){ //si ha recibido alguna celula			
+			printf("\n");
+			for(int k = 0; k<contadorCellsRecibidas; k++){ //recorre hasta el total que tiene que recibir
+				Cell celulaRecibida; //celula que se va a recibir
+				MPI_Recv(&celulaRecibida, 1, MPI_CELL_EXT, MPI_ANY_SOURCE, 1, MPI_COMM_WORLD, &state); //recibe una celula
+				//MPI_Wait(MPI_COMM_WORLD);
+				printf("edadRecibir%i   lo recibe       %i", celulaRecibida.age, rank);
+				printf("\n");
+				//printf("años%i",celulasRecibida.age);
+				celulasRecibidas2[k] = celulaRecibida; //almacena la celula recibida en el array de celulas totales recibidas
+			}				
+		}
+
+		my_num_cellsTemp = my_num_cells; 
+
+
+		my_num_cells += contadorCellsRecibidas;
+
+		my_cells = (Cell *)realloc( my_cells, sizeof(Cell) * my_num_cells );
+
+
+		indice = 0;
+
+		//Fusionar las celulas recibidas a my_cells
+		for(i=0; i<my_num_cells; i++){
+			if(my_num_cellsTemp<=i){
+				my_cells[i] = celulasRecibidas2[indice];
+				indice++;
+			}
+		}
+
+
 		sim_stat.history_total_cells = sim_stat.history_total_cells + step_new_cells;
 		num_cells_alive = num_cells_alive + step_new_cells;
 
@@ -1023,11 +1081,14 @@ int main(int argc, char *argv[]) {
 		tiempoBucle5 = cp_Wtime();
 		int free_position = 0;
 		int alive_in_main_list = 0;
+		int celulasMuertasEnUnProcesador = 0;
 
 		for (i=0; i<my_num_cells; i++) {
-				if ( cells[i].alive ) {
+				if ( my_cells[i].alive ) {
 					//accessMat( culture, cells[i].pos_row, cells[i].pos_col ) = 0.0f;
-					culture[i] = 0.0f; //actualizamos la casilla de solo ese procesador
+					posicionMyCellsEnMiCulture = (int) my_cells[i].pos_row * columns + (int) my_cells[i].pos_col;
+					posicionMyCellsEnMiCulture -= my_begin;
+					culture[posicionMyCellsEnMiCulture] = 0.0f; //actualizamos la casilla de solo ese procesador
 					alive_in_main_list ++;
 					if ( free_position != i ) {
 						my_cells[free_position] = my_cells[i]; //Recolocamos vector de celulas de cada procesador
@@ -1042,7 +1103,8 @@ int main(int argc, char *argv[]) {
 				alive_in_main_list = alive_in_main_list_suma;
 		}
 		*/
-
+		printf("\n");	
+		printf("hola buenos dias");
 		tiempoBucle5 = cp_Wtime() - tiempoBucle5;
 		tiempoTotalBucle5 =	tiempoTotalBucle5 + tiempoBucle5;
 		/* 4.5.2. Free the ancillary data structure to store the food to be shared */
@@ -1052,15 +1114,17 @@ int main(int argc, char *argv[]) {
 		tiempoTotalBucle6 =	tiempoTotalBucle6 + tiempoBucle6;
 		// 4.6.2. Reduce the storage space of the list to the current number of cells
 		my_num_cells = alive_in_main_list;
-		my_cells = (Cell *)realloc( cells, sizeof(Cell) * my_num_cells ); //reasignamos espacio en funcion de las celulas vivas para cada array cells de cada procesador
+
+		my_cells = (Cell *)realloc( my_cells, sizeof(Cell) * my_num_cells ); //reasignamos espacio en funcion de las celulas vivas para cada array cells de cada procesador
 		/* 4.7. Join cell lists: Old and new cells list */
 		tiempoBucle7 = cp_Wtime();
+		/*
 		if ( step_new_cells > 0 ) {
 			my_cells = (Cell *)realloc( cells, sizeof(Cell) * ( my_num_cells + step_new_cells ) ); //reasignamos espacio en funcion de las celulas vivas que habia y las nuevas que han nacido (step_new_cells)
 			for (j=0; j<step_new_cells; j++)
 				my_cells[ my_num_cells + j ] = new_cells[ j ]; //le asignamos la nuevas celulas almacenadas en el array new_cells
 			my_num_cells += step_new_cells; //sumamos el numero de celulas de cada proceso a las que han nacido en ese proceso
-		}
+		}*/
 		free( new_cells );
 		tiempoBucle7 = cp_Wtime() - tiempoBucle7;
 
@@ -1080,6 +1144,8 @@ int main(int argc, char *argv[]) {
 
 
 		//FALTA
+		int peque2 = 0;
+		MPI_Reduce(&current_max_food, &peque2, 1, MPI_FLOAT, MPI_MAX, 0, MPI_COMM_WORLD);
 
 		for( i=0; i<my_size; i++ ){
 			culture[i] *= 0.95f;
@@ -1153,6 +1219,20 @@ int main(int argc, char *argv[]) {
 		// Statistics: Max alive cells per step
 		if ( num_cells_alive > sim_stat.history_max_alive_cells ) sim_stat.history_max_alive_cells = num_cells_alive;
 
+		MPI_Barrier(MPI_COMM_WORLD);
+
+		printf("\n");
+		printf("\n");
+		printf("\n");
+		printf("\n");
+		printf("\n");
+		printf("he logrado acabar que bien %i", rank);
+		printf("\n");
+		printf("\n");
+		printf("\n");
+		printf("\n");
+		printf("\n");
+
 
 #ifdef DEBUG
 		/* 4.10. DEBUG: Print the current state of the simulation at the end of each iteration */
@@ -1166,7 +1246,6 @@ int main(int argc, char *argv[]) {
  * STOP HERE: DO NOT CHANGE THE CODE BELOW THIS POINT
  *
  */
-
 	/* 5. Stop global time */
 	MPI_Barrier( MPI_COMM_WORLD );
 	ttotal = cp_Wtime() - ttotal;
@@ -1177,63 +1256,65 @@ int main(int argc, char *argv[]) {
 		printf("Cell %d, Alive: %d, Pos(%f,%f), Mov(%f,%f), Choose_mov(%f,%f,%f), Storage: %f, Age: %d\n",
 				i,
 				cells[i].alive,
-				cells[i].pos_row,
-				cells[i].pos_col,
-				cells[i].mov_row,
-				cells[i].mov_col,
-				cells[i].choose_mov[0],
-				cells[i].choose_mov[1],
-				cells[i].choose_mov[2],
+				cells[i].pos_row, 
+				cells[i].pos_col, 
+				cells[i].mov_row, 
+				cells[i].mov_col, 
+				cells[i].choose_mov[0], 
+				cells[i].choose_mov[1], 
+				cells[i].choose_mov[2], 
 				cells[i].storage,
 				cells[i].age );
 	}
 #endif // DEBUG
 
 	/* 6. Output for leaderboard */
-	printf("\n");
-	/* 6.1. Total computation time */
-	printf("Time: %lf\n", ttotal );
+	if ( rank == 0 ) {
+		printf("\n");
+		/* 6.1. Total computation time */
+		printf("Time: %lf\n", ttotal );
 
-	/* 6.2. Results: Number of iterations and other statistics */
-	
-	printf("Inicialización 1 3: %lf", tiempoTotalBucle1);
-	printf("\n");
-	printf("Inicialización 2 3: %lf", tiempoTotalBucle2);
-	printf("\n");
-	printf("Tirar nueva comida 4.1: %lf", tiempoTotalBucle9);
-	printf("\n");
-	printf("Preparar estructuras 4.2: %lf", tiempoTotalBucle10);
-	printf("\n");
-	printf("Movimiento celulas 4.3: %lf", tiempoTotalBucle3);
-	printf("\n");
-	printf("Accion celulas 4.4: %lf", tiempoTotalBucle4);
-	printf("\n");
-	printf("Limpieza comida consumida 4.5: %lf", tiempoTotalBucle5);
-	printf("\n");
-	printf("Limpieza celulas muertas 4.6: %lf", tiempoTotalBucle6);
-	printf("\n");
-	printf("Nuevas celulas 4.7: %lf", tiempoTotalBucle7);
-	printf("\n");
-	printf("Decremento comida que no se consume 4.8: %lf", tiempoTotalBucle8);
-	printf("\n");
-	
-	printf("Result: %d, ", iter);
-	printf("%d, %d, %d, %d, %d, %d, %d, %f\n",
-		num_cells_alive,
-		sim_stat.history_total_cells,
-		sim_stat.history_dead_cells,
-		sim_stat.history_max_alive_cells,
-		sim_stat.history_max_new_cells,
-		sim_stat.history_max_dead_cells,
-		sim_stat.history_max_age,
-		sim_stat.history_max_food
-	);
+		printf("Inicialización 1 3: %lf", tiempoTotalBucle1);
+		printf("\n");
+		printf("Inicialización 2 3: %lf", tiempoTotalBucle2);
+		printf("\n");
+		printf("Tirar nueva comida 4.1: %lf", tiempoTotalBucle9);
+		printf("\n");
+		printf("Preparar estructuras 4.2: %lf", tiempoTotalBucle10);
+		printf("\n");
+		printf("Movimiento celulas 4.3: %lf", tiempoTotalBucle3);
+		printf("\n");
+		printf("Accion celulas 4.4: %lf", tiempoTotalBucle4);
+		printf("\n");
+		printf("Limpieza comida consumida 4.5: %lf", tiempoTotalBucle5);
+		printf("\n");
+		printf("Limpieza celulas muertas 4.6: %lf", tiempoTotalBucle6);
+		printf("\n");
+		printf("Nuevas celulas 4.7: %lf", tiempoTotalBucle7);
+		printf("\n");
+		printf("Decremento comida que no se consume 4.8: %lf", tiempoTotalBucle8);
+		printf("\n");
 
-	/* 7. Free resources */
+		/* 6.2. Results: Number of iterations and other statistics */
+		printf("Result: %d, ", iter);
+		printf("%d, %d, %d, %d, %d, %d, %d, %f\n", 
+			num_cells_alive, 
+			sim_stat.history_total_cells, 
+			sim_stat.history_dead_cells, 
+			sim_stat.history_max_alive_cells, 
+			sim_stat.history_max_new_cells, 
+			sim_stat.history_max_dead_cells, 
+			sim_stat.history_max_age,
+			sim_stat.history_max_food
+		);
+	}
+
+	/* 7. Free resources */	
 	free( culture );
 	free( culture_cells );
 	free( cells );
 
 	/* 8. End */
+	MPI_Finalize();
 	return 0;
 }
