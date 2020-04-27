@@ -426,6 +426,8 @@ int main(int argc, char *argv[]) {
 		cells[i].age = 1 + (int)(19 * erand48( cells[i].random_seq ));
 		// Initial storage: Between 10 and 20 units
 		cells[i].storage = (float)(10 + 10 * erand48( cells[i].random_seq ));
+		printf("storage   %lf    ",cells[i].storage);
+		printf("\n");
 		// Initial position: Anywhere in the culture arena
 		cells[i].pos_row = (float)(rows * erand48( cells[i].random_seq ));
 		cells[i].pos_col = (float)(columns * erand48( cells[i].random_seq ));
@@ -453,7 +455,7 @@ int main(int argc, char *argv[]) {
 
 	my_num_cells = 0; //reseteamos el valor
 	posicionMyCells = 0;
-
+	
 	for( i=0; i<num_cells; i++ ) {
 		posicionMyCells = (int) cells[i].pos_row * columns + (int) cells[i].pos_col;
 		if(posicionMyCells <= my_end && posicionMyCells >= my_begin){
@@ -461,9 +463,27 @@ int main(int argc, char *argv[]) {
 			my_num_cells++; //incrementamos su numero de celulas
 		}
 	}
+	 /*
+	for( i=0; i<num_cells; i++ ) {
+		posicionMyCells = (int) cells[i].pos_row * columns + (int) cells[i].pos_col;
+		if(posicionMyCells <= my_end && posicionMyCells >= my_begin){
+			my_cells[my_num_cells].alive = cells[i].alive;
+			my_cells[my_num_cells].age = cells[i].age;
+			my_cells[my_num_cells].storage = cells[i].storage;
+			my_cells[my_num_cells].pos_row = cells[i].pos_row;
+			my_cells[my_num_cells].pos_col = cells[i].pos_col;
+			my_cells[my_num_cells].mov_row = cells[i].mov_row;
+			my_cells[my_num_cells].mov_col = cells[i].mov_col;
+			my_cells[my_num_cells].choose_mov[0] = cells[i].choose_mov[0];
+			my_cells[my_num_cells].choose_mov[1] = cells[i].choose_mov[1];
+			my_cells[my_num_cells].choose_mov[2] = cells[i].choose_mov[2];
+			//my_cells[my_num_cells] = cells[i]; //añadimos la celula al array de ese proceso
+			my_num_cells++; //incrementamos su numero de celulas
+		}
+	}*/
 
 	posicionMyCells = 0; //reseteamos valor para el resto de la ejecucion
-	//free(cells); //liberamos el espacio de cells, a partir de aqui solo se usara my_cells que sera el array de celulas de cada procesador
+	 //liberamos el espacio de cells, a partir de aqui solo se usara my_cells que sera el array de celulas de cada procesador
 	
 	tiempoBucle2 = cp_Wtime() - tiempoBucle2;
 	tiempoTotalBucle2 = 	tiempoTotalBucle2 + tiempoBucle2;
@@ -579,10 +599,15 @@ int main(int argc, char *argv[]) {
 		/* 4.3. Cell movements */
 		for (i=0; i<my_num_cells; i++) {
 			if ( my_cells[i].alive ) {
-				 /*
-				printf("los años de la celua son   %i  la celula   %i    iteracion    %i", my_cells[i].age, i, iter);
-				printf("\n");*/
+				
+				/*
+				if(iter==12){
+					printf("edad de la celula    %i   storage de la celula   %lf      iteracion    %i     posicion      %i ", my_cells[i].age, my_cells[i].storage, iter, i);
+					printf("\n");
+				}	*/
+
 				my_cells[i].age ++;
+
 				/*
 				printf("los años de la celua son   %i  la celula   %i    iteracion    %i", my_cells[i].age, i, iter);
 				printf("\n");*/
@@ -749,9 +774,18 @@ int main(int argc, char *argv[]) {
 				float my_food = food / count;
 
 				my_cells[i].storage += my_food;
-
+				/*
+				if(iter==11){
+					printf("edad de la celula    %i   storage de la celula   %lf      iteracion    %i     posicion    %i", my_cells[i].age, my_cells[i].storage, iter, i);
+					printf("\n");
+				}	
+				
+					*/
+				
 				/* 4.4.2. Split cell if the conditions are met: Enough maturity and energy */
 				if ( my_cells[i].age > 30 && my_cells[i].storage > 20 ) {
+					//printf("iteracion %i", iter);
+					//printf("\n");
 					// Split: Create new cell
 
 					num_cells_alive ++; //hace un reduce MPI_SUM ****************************************************************************************************************************************
@@ -759,6 +793,11 @@ int main(int argc, char *argv[]) {
 
 					step_new_cells ++;
 					my_step_new_cells++;
+					/*
+					if(iter==11){
+						printf("ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss            %i", my_step_new_cells);
+						printf("\n");
+					}*/
 
 					// New cell is a copy of parent cell
 					new_cells[ step_new_cells-1 ] = my_cells[i];
@@ -816,6 +855,9 @@ int main(int argc, char *argv[]) {
 			}
 		} // End cell actions
 
+
+					//printf("edad de la celula    %i   storage de la celula   %lf      iteracion    %i", my_cells[19].age, my_cells[i].storage, iter);
+					//printf("\n");
 
 		int *medidorDeStepNewCellsTotales = (int *)calloc((size_t)procs ,sizeof(int));
 
@@ -939,7 +981,7 @@ int main(int argc, char *argv[]) {
 		*/
 
 		// 4.6.2. Reduce the storage space of the list to the current number of cells
-		my_num_cells = alive_in_main_list;
+		my_num_cells = alive_in_main_list ;
 		//my_cells = (Cell *)realloc( cells, sizeof(Cell) * my_num_cells );
 
 		//food_to_share = (float *)realloc(food_to_share, sizeof(float) * my_num_cells );
@@ -949,19 +991,51 @@ int main(int argc, char *argv[]) {
 		printf("\n");
 		*/
 		/* 4.7. Join cell lists: Old and new cells list */
+
+		
+		Cell *my_cellsTemp = (Cell *)malloc( sizeof(Cell) * (size_t)my_num_cells );
+
+
+		if(my_step_new_cells > 0){
+			for(i=0;i<my_num_cells;i++){
+				my_cellsTemp[i] = my_cells[i];
+			}
+		}
+
+
 		if ( my_step_new_cells > 0 ) {
 			my_cells = (Cell *)realloc( cells, sizeof(Cell) * ( my_num_cells + my_step_new_cells ) );
-			for (j=0; j<step_new_cells; j++)
+			for (j=0; j<my_step_new_cells; j++)
 				my_cells[ my_num_cells + j ] = new_cells[ j ];
 			my_num_cells += my_step_new_cells;
 		}
+
+
+		if(my_step_new_cells > 0){
+			for(i=0;i<my_num_cells-my_step_new_cells;i++){
+				my_cells[i] = my_cellsTemp[i];
+			}
+		}
+		/*
+		if(iter == 12){
+			printf("dios mio");
+		}*/
 		/*
 		printf("los años de la celua son   %i  la celula   %i    iteracion    %i", my_cells[73].age, 73, iter);
 		fflush(stdout);
 		printf("\n");
 		*/
 		//free( new_cells );
-
+		/*
+		for (i=0; i<my_num_cells; i++) {
+			if ( my_cells[i].alive ) {
+				if(iter==11){
+					printf("edad de la celula    %i   storage de la celula   %lf      iteracion    %i     posicion    %i", my_cells[i].age, my_cells[i].storage, iter, i);
+					printf("\n");
+				}	
+			}
+		}
+		*/
 		/* 4.8. Decrease non-harvested food */
 		current_max_food = 0.0f;
 		for( i=0; i<my_size; i++ ){
@@ -970,6 +1044,7 @@ int main(int argc, char *argv[]) {
 			if ( culture[i] > current_max_food )
 				current_max_food = culture[i];
 		}
+
 
 		float reduceMaxFood = 0;
 		int reduceCellsAlive = 0;
@@ -1019,7 +1094,6 @@ int main(int argc, char *argv[]) {
 		MPI_Reduce(&reduceMaxAgeTemp, &reduceMaxAge, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 		sim_stat.history_max_age = reduceMaxAge;
 		
-
 		/* 4.9. Statistics */
 		// Statistics: Max food
 		if ( current_max_food > sim_stat.history_max_food ) sim_stat.history_max_food = current_max_food;
@@ -1030,7 +1104,11 @@ int main(int argc, char *argv[]) {
 		if ( step_dead_cells > sim_stat.history_max_dead_cells ) sim_stat.history_max_dead_cells = step_dead_cells;
 		// Statistics: Max alive cells per step
 		if ( num_cells_alive > sim_stat.history_max_alive_cells ) sim_stat.history_max_alive_cells = num_cells_alive;
-
+		/*
+		if(iter==386){
+			printf("holaaa%i", sim_stat.history_max_dead_cells);
+			printf("\n");
+		}*/
 
 #ifdef DEBUG
 		/* 4.10. DEBUG: Print the current state of the simulation at the end of each iteration */
@@ -1088,8 +1166,8 @@ int main(int argc, char *argv[]) {
 	}
 
 	/* 7. Free resources */	
-	//free( culture );
-	//free( culture_cells );
+	free( culture );
+	free( culture_cells );
 	//free( cells );
 
 	/* 8. End */
